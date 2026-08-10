@@ -31,6 +31,8 @@ Prompt text erodes under context pressure. Enforcement has to survive a long ses
 - `hatstack review eng` produces a report file written by a process that never saw the building agent's context, and exits non-zero on a BLOCK verdict.
 - With no reviewer CLI installed, `hatstack review` exits 3 and reports review unavailable. It never falls back to self-review.
 - The same `hatstack check tdd` invocation produces identical decisions when called from a Claude Code hook, a git pre-commit hook, and a bare shell.
+- `hatstack install` run twice against the same tree produces no second change, and `--uninstall` returns the machine to its pre-install state with nothing outside the manifest touched.
+- `hatstack install` skips a host whose directory does not exist, and says so.
 - hatstack's own test suite is written test-first and passes under `node --test`.
 
 ## Architecture
@@ -38,7 +40,7 @@ Prompt text erodes under context pressure. Enforcement has to survive a long ses
 One repo. The portable core is a zero-dependency Node CLI; everything else is markdown and thin adapters.
 
 ```
-bin/hatstack.mjs                 CLI entry: check | test | review | media | init
+bin/hatstack.mjs                 CLI entry: check | test | review | media | init | install
 lib/
   plan.mjs                       parse plan markdown -> {approaches[], criteria[], approved}
   state.mjs                      read/write .hatstack/state.json, TDD state machine
@@ -46,6 +48,7 @@ lib/
   review.mjs                     reviewer CLI detection + dispatch + report capture
   media.mjs                      fal / openrouter providers + provenance manifest
   config.mjs                     .hatstack/config.json load + defaults
+  hosts.mjs                      host table, detection, link/unlink (machine install)
 hats/
   eng/{plan.md,build.md,reviewer.md}
   seo/{plan.md,reviewer.md}
@@ -57,9 +60,9 @@ skills/
   red-green-refactor/SKILL.md
   adversarial-review/SKILL.md
 adapters/
-  claude-code/                   plugin.json, commands/, agents/, hooks/ (exit code -> JSON)
+  claude-code/                   .claude-plugin/plugin.json, commands/, agents/, hooks/
   codex/AGENTS.md
-  gemini/GEMINI.md
+  gemini/{GEMINI.md,gemini-extension.json}
   cursor/.cursorrules
   git/pre-commit
 test/                            node:test, mirrors lib/
@@ -83,7 +86,38 @@ Nothing about Claude Code appears in `lib/`. Adapters translate:
 - **git** — `adapters/git/pre-commit` runs every applicable check against the staged set and exits non-zero. Commit-time, not write-time, but identical on every harness including agents that ignore their instruction file.
 - **Codex / Gemini / Cursor** — instruction files telling the agent to run `hatstack check` before writing. Soft. The pre-commit hook is the backstop.
 
-`hatstack init` writes `.hatstack/`, installs the git hook, and drops the adapter files the project asks for.
+### Installation
+
+Two scopes, two commands, one binary. No separate `setup` script — `npx hatstack` is the bootstrap, and Node was already the only requirement.
+
+| Scope | Command | Effect |
+|---|---|---|
+| Machine | `npx hatstack install [--host X] [--copy] [--uninstall]` | Detect installed harnesses, link hats and skills into each one's directory. |
+| Project | `hatstack init` | Write `.hatstack/`, install the git pre-commit hook, drop the project-local adapter files. |
+
+Prior art splits on this and hatstack takes both halves. gstack ships a `./setup` that auto-detects ten hosts and **copies** skill directories into each. superpowers ships no installer at all — it commits native manifests (`gemini-extension.json`, `AGENTS.md`, a Codex plugin dir) and lets each harness's own plugin system do the installing.
+
+**Native manifests are the primary path.** Any harness with a real plugin system installs hatstack through it and never runs `install`. The installer is the fallback for harnesses that only read a directory.
+
+**Symlink by default, copy on request.** Copying forks every rubric per host; after one edit to `hats/eng/reviewer.md` you have four stale versions and no way to tell which a reviewer loaded. A symlink means one edit reaches every harness. `--copy` exists for hosts that do not follow symlinks, and a copied install is recorded as such in the manifest so `install` can warn when the source has moved on.
+
+**Host table** (`lib/hosts.mjs`) — one row per harness: detection path, install path, link style, and which adapter files it wants. Adding a host is a row, not a code path.
+
+| Host | Detect | Install to |
+|---|---|---|
+| Claude Code | `~/.claude/` | `~/.claude/plugins/` (or native marketplace) |
+| Codex | `~/.codex/` | `~/.codex/skills/hatstack/` |
+| Cursor | `~/.cursor/` | `~/.cursor/skills/hatstack/` |
+| Gemini CLI | `~/.gemini/` | `~/.gemini/extensions/hatstack/` |
+
+Rules the installer holds to:
+
+- **Never install to a host that is not there.** Detection is the presence of the host's own directory. Report what was found and what was skipped; a silent no-op is how you end up debugging a hat that was never installed.
+- **Idempotent.** Running twice changes nothing. Re-running after an upgrade repairs links.
+- **Reversible.** `--uninstall` removes exactly what was installed, tracked in `~/.hatstack/install-manifest.json`. Nothing outside that manifest is ever deleted.
+- **Never overwrites a foreign file.** An existing non-hatstack file at a target path aborts that host with the path named, rather than clobbering it.
+
+Path verification is a stage-3 precondition alongside the reviewer-CLI check: the install paths above are the documented conventions, confirmed per host before the installer depends on them.
 
 ## Components
 
@@ -220,6 +254,7 @@ Written test-first with `node:test`. hatstack gates its own development.
 - `gates.mjs` — exit code per scenario; path classification (test file, doc, source under and outside `src_globs`).
 - `review.mjs` — dispatch with a fake reviewer executable: report captured, BLOCK maps to non-zero, no-CLI maps to exit 3.
 - `media.mjs` — payload construction per provider and model with `fetch` stubbed. No live API calls in the suite.
+- `hosts.mjs` — detection against a fake HOME containing some host dirs and not others; idempotency (second run is a no-op); `--uninstall` restores the tree exactly; an existing foreign file at a target path aborts that host without writing. Never touches the real home directory.
 - One integration test per adapter: the Claude hook wrapper emits valid decision JSON for allow and deny; the pre-commit hook fails a commit whose staged source has no RED on record.
 
 ## Build order
@@ -227,7 +262,8 @@ Written test-first with `node:test`. hatstack gates its own development.
 1. **Core** — CLI skeleton, `plan.mjs`, `state.mjs`, `gates.mjs`, config, `hatstack init`, `hatstack test`.
 2. **Eng hat + Claude Code adapter** — commands, reviewer rubric, hooks, `review.mjs`. First end-to-end loop.
    Precondition: confirm the real non-interactive invocation of each reviewer CLI on this machine (`claude --help`, `codex --help`, `gemini --help`) and add one smoke test per detected CLI that pipes a trivial packet and asserts a non-empty response. The auto-detect list is a guess until that passes; `reviewer_cmd` absorbs whatever the true forms are.
-3. **Adapters** — git pre-commit, `AGENTS.md`, `GEMINI.md`, `.cursorrules`. Portability stops being prose once a second harness runs the loop.
+3. **Adapters + installer** — git pre-commit, `AGENTS.md`, `GEMINI.md`, `gemini-extension.json`, `.cursorrules`, `hosts.mjs`, `hatstack install`. Portability stops being prose once a second harness runs the loop.
+   Precondition: confirm each host's real install path and whether it follows symlinks, before the host table depends on the documented convention.
 4. **Remaining hats** — seo, marketing, accounting, ceo. Rubrics only, cheap once 1–3 hold.
 5. **Media** — `lib/media.mjs`, verified against a live key.
 
@@ -240,4 +276,4 @@ Each stage is independently useful and shippable.
 
 ## Prior art
 
-[superpowers](https://github.com/obra/superpowers) — the loop. [gstack](https://github.com/garrytan/gstack) — multi-role reviewers. [impeccable](https://github.com/pbakaus/impeccable) — rubric-driven quality passes.
+[superpowers](https://github.com/obra/superpowers) — the loop, and native per-harness manifests over an installer. [gstack](https://github.com/garrytan/gstack) — multi-role reviewers, and host auto-detection in `./setup`. [impeccable](https://github.com/pbakaus/impeccable) — rubric-driven quality passes.
