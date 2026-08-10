@@ -1,0 +1,10 @@
+{
+  "name": "hatstack",
+  "version": "0.1.0",
+  "description": "Plan with three approaches, gate on a human, build test-first, review adversarially with a different agent.",
+  "author": { "name": "Algorabia" },
+  "license": "MIT",
+  "commands": "./commands",
+  "agents": "./agents",
+  "hooks": "./hooks/hooks.json"
+}

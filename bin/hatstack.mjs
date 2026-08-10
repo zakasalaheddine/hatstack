@@ -101,27 +101,47 @@ async function main() {
       const { init } = await import("../lib/init.mjs");
       return init({ root: flag("root", process.cwd()) });
     }
+    case "hook": {
+      const which = argv[1];
+      const root = flag("root", process.env.CLAUDE_PROJECT_DIR || process.cwd());
+      const { claudePreWrite, claudePostBash } = await import("../lib/hooks-claude.mjs");
+      if (which === "claude-pre-write") {
+        await claudePreWrite({ root });
+      } else if (which === "claude-post-bash") {
+        await claudePostBash({ root });
+      } else {
+        fail("usage: hatstack hook <claude-pre-write|claude-post-bash>", 2);
+      }
+      return;
+    }
     case "review": {
       const { runReview } = await import("../lib/review.mjs");
-      return runReview({
+      const res = runReview({
         hat: argv[1],
-        root: flag("root", process.cwd()),
+        root: flag("root", process.env.CLAUDE_PROJECT_DIR || process.cwd()),
         diff: flag("diff"),
         files: flag("files"),
       });
+      if (res.reason) process.stdout.write(res.reason + "\n");
+      process.exit(res.exitCode ?? 0);
+      return;
     }
     case "media": {
       const { runMedia } = await import("../lib/media.mjs");
-      return runMedia(argv.slice(1));
+      const res = await runMedia(argv.slice(1));
+      process.exit(res?.exitCode ?? 0);
+      return;
     }
     case "install": {
       const { install } = await import("../lib/hosts.mjs");
-      return install({
+      const res = install({
         host: flag("host"),
         copy: flag("copy") === true,
         uninstall: flag("uninstall") === true,
         home: flag("home"),
       });
+      process.exit(res?.exitCode ?? 0);
+      return;
     }
     case "version":
     case "--version":
