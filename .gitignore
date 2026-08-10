@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+.hatstack/state.json
+.hatstack/media/
+.hatstack/reviews/
