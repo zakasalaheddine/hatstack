@@ -1,0 +1,23 @@
+{
+  "name": "hatstack",
+  "version": "0.1.0",
+  "description": "Plan with three approaches, gate on a human, build test-first, review adversarially with a different agent. Portable across Claude Code, Codex, Gemini CLI and Cursor.",
+  "type": "module",
+  "bin": {
+    "hatstack": "bin/hatstack.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "hats/",
+    "skills/",
+    "adapters/"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# hatstack git pre-commit backstop.
+#
+# The same gate decision as every harness — this one runs at commit time and
+# catches agents that ignore their instruction file entirely. `hatstack init`
+# copies this into .git/hooks/pre-commit and fills in the CLI entry path below.
+set -uo pipefail
+
+HATSTACK="${HATSTACK_BIN:-hatstack}"
+if ! command -v "$HATSTACK" >/dev/null 2>&1; then
+  HATSTACK="node __HATSTACK_ENTRY__"
+fi
+
+ROOT=$(git rev-parse --show-toplevel)
+FAILED=0
+
+# Plan gate — whole-tree, independent of which files are staged.
+if ! OUT=$($HATSTACK check plan --root "$ROOT"); then
+  echo "hatstack: plan gate blocked the commit:" >&2
+  echo "$OUT" >&2
+  FAILED=1
+fi
+
+# TDD gate — one decision per staged source file.
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  if ! OUT=$($HATSTACK check tdd --root "$ROOT" --file "$f"); then
+    echo "hatstack: TDD gate blocked '$f':" >&2
+    echo "$OUT" >&2
+    FAILED=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "" >&2
+  echo "hatstack: commit blocked. Fix the above, or disable a gate deliberately in .hatstack/config.json." >&2
+  exit 1
+fi
+exit 0
