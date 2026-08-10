@@ -77,11 +77,9 @@ test("the Claude reviewer agent does not fork from the canonical hat rubric", ()
 });
 
 test("the Claude plugin manifest is valid JSON with the expected wiring", () => {
-  const manifest = JSON.parse(
-    readFileSync(join(PKG, "adapters", "claude-code", ".claude-plugin", "plugin.json"), "utf8")
-  );
+  const manifest = JSON.parse(readFileSync(join(PKG, ".claude-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.name, "hatstack");
-  assert.equal(manifest.hooks, "./hooks/hooks.json");
+  assert.equal(manifest.hooks, "./adapters/claude-code/hooks/hooks.json");
   const hooks = JSON.parse(readFileSync(join(PKG, "adapters", "claude-code", "hooks", "hooks.json"), "utf8"));
   assert.ok(hooks.hooks.PreToolUse[0].matcher.includes("Write"));
   assert.ok(hooks.hooks.PostToolUse[0].matcher.includes("Bash"));

@@ -1,0 +1,15 @@
+# hatstack loop (Cursor / Windsurf)
+
+This project runs the hatstack loop: plan with three approaches → a human approves → build test-first → an independent agent reviews. Cursor has no reliable pre-write deny primitive, so enforcement here is this rules file plus a git pre-commit backstop that runs the identical checks. Treat the instructions as binding.
+
+Before writing, run the applicable gate and obey a non-zero exit (0 allow, 2 deny with the reason on stdout, 3 cannot-evaluate = deny):
+
+- `hatstack check plan` — three approved approaches are required before any build write.
+- `hatstack check tdd --file <path>` — source writes need a failing test on record.
+- `hatstack check accept --file <path>` — deliverables need success criteria declared in the plan.
+
+Planning: write `.hatstack/plans/<slug>.md` with three genuinely distinct `## Approach N` sections, each with Pros, Cons, Reversibility and Cost; record the path in `.hatstack/active-plan`; present the options to the human and stop. Never write the `APPROVED:` line yourself — it is the human's signature.
+
+Building: failing test first via `hatstack test -- <cmd>` (records RED), then the minimum code to pass (GREEN), then refactor under green. No implementation before a test exists.
+
+Review: `hatstack review eng --diff HEAD` runs a fresh reviewer that never saw your context. Never review your own work. A BLOCK verdict means the work is not done.
