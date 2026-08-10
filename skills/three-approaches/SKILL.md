@@ -5,25 +5,23 @@ description: Produce a decision document offering at least three genuinely disti
 
 # Three Approaches
 
-Planning output that a human can actually decide on. The failure mode this exists to prevent is the agent picking an approach in its own head, then writing a plan that argues for it — the alternatives present as strawmen and the human rubber-stamps.
+Planning output a human can actually decide on. The failure mode this exists to prevent: the agent picks an approach in its own head, then writes a plan that argues for it — the alternatives present as strawmen and the human rubber-stamps.
 
 ## The rule
 
 **Three approaches minimum, and they must be genuinely different.** Different in *strategy*, not in parameters. `Postgres` vs `Postgres with a different index` is one approach. `Postgres` vs `SQLite embedded` vs `don't persist, recompute on read` is three.
 
-If the space really is constrained — two options and the third is a stretch — say so in the plan explicitly and explain why. An honest "there are only two viable paths here, and here's the disqualified third" is acceptable. Padding with a fake option is not.
+If the space really is constrained — two options and the third is a stretch — say so explicitly in a `## Constrained space` section naming the disqualified third and why. The plan gate accepts that in place of the third approach. An honest "there are only two viable paths here" is fine. Padding with a fake option is not.
 
 ## Before writing anything
 
-Interrogate the request. You are looking for the problem behind the ask:
+Interrogate the request. You are looking for the problem behind the ask. Ask one or two at a time, in conversation — do not dump five questions and wait:
 
-1. What breaks today if we do nothing? Get a concrete instance, not a category.
+1. What breaks today if we do nothing? A concrete instance, not a category.
 2. Who is affected, and how do they work around it now?
 3. What does success look like in a number?
 4. What constraint is non-negotiable — budget, deadline, a system that can't change, a legal requirement?
 5. What has already been tried?
-
-Ask these one or two at a time in conversation. Do not dump five questions and wait.
 
 ## Plan artifact
 
@@ -65,16 +63,16 @@ Things you could not resolve. Do not silently guess.
 APPROVED:
 ```
 
-The `APPROVED:` line stays empty until the human answers.
+All four of **Pros**, **Cons**, **Reversibility**, **Cost** are enforced on every approach — the gate denies if any is missing. The `APPROVED:` line stays empty until the human answers.
 
 ## The gate
 
-After writing the plan, **present the approaches and stop.** Use `AskUserQuestion` with one option per approach plus "none of these". Do not begin work, do not create files, do not open a branch.
+After writing the plan, **present the approaches and stop.** Use the harness's question primitive (Claude `AskUserQuestion`) with one option per approach plus "none of these". Do not begin work, do not create files, do not open a branch.
 
 When the human answers, write `APPROVED: <approach name> — <date>` into the plan and proceed. If they pick "none of these", go back to the interrogation — you misread the problem, not the options.
 
-**Never write the APPROVED line on your own authority.** The plan gate checks for it precisely because it is the human's signature. Forging it defeats the entire plugin.
+**Never write the APPROVED line on your own authority.** The plan gate checks for it precisely because it is the human's signature. Forging it defeats the entire loop.
 
 ## Reversibility is the tiebreaker
 
-When two approaches score similarly, prefer the one that is cheaper to undo. Most decisions are made with bad information; the value of a reversible choice is that it converts a bet into an experiment. Say this out loud in the recommendation when it applies.
+When two approaches score similarly, prefer the one that is cheaper to undo. Most decisions are made with bad information; a reversible choice converts a bet into an experiment. Say this out loud in the recommendation when it applies.

@@ -1,7 +1,7 @@
 # hatstack — design
 
 Date: 2026-08-10
-Status: approved (design), not yet implemented
+Status: implemented — zero-dependency Node CLI, all five build stages landed, node:test suite green
 
 ## Problem
 

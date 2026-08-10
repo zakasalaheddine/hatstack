@@ -66,8 +66,18 @@ test("init scaffolds .hatstack and is idempotent", () => {
   assert.equal(first.status, 0);
   assert.ok(existsSync(join(root, ".hatstack", "config.json")));
   assert.ok(existsSync(join(root, ".hatstack", "plans")));
+  assert.ok(existsSync(join(root, "AGENTS.md")), "init should drop the Codex adapter file");
+  assert.ok(existsSync(join(root, ".cursorrules")), "init should drop the Cursor adapter file");
   const second = run(["init", "--root", root]);
   assert.match(second.stdout, /already initialised/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("init never clobbers an existing AGENTS.md", () => {
+  const root = mkdtempSync(join(tmpdir(), "hs-init-"));
+  writeFileSync(join(root, "AGENTS.md"), "MY OWN INSTRUCTIONS");
+  run(["init", "--root", root]);
+  assert.equal(readFileSync(join(root, "AGENTS.md"), "utf8"), "MY OWN INSTRUCTIONS");
   rmSync(root, { recursive: true, force: true });
 });
 
