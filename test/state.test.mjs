@@ -17,6 +17,13 @@ test("classifyRun: zero exit but failure text is red", () => {
   assert.equal(classifyRun({ exitCode: 0, stderr: "FAIL src/x.test.js" }), "red");
 });
 
+test("classifyRun: passing output that mentions '0 failed' stays green", () => {
+  // Regression: the /i flag once let a bare FAILED match "0 failed".
+  assert.equal(classifyRun({ exitCode: 0, stdout: "Tests: 0 failed, 5 passed" }), "green");
+  assert.equal(classifyRun({ exitCode: 0, stdout: "5 passed in 0.10s" }), "green");
+  assert.equal(classifyRun({ exitCode: 0, stdout: "0 failing" }), "green");
+});
+
 test("buildState: green carries a window, red does not", () => {
   const g = buildState({ status: "green", now: 1000, config: cfg });
   assert.equal(g.window_expires, 1600);
