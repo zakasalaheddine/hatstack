@@ -7,7 +7,7 @@ set -uo pipefail
 if command -v hatstack >/dev/null 2>&1; then
   HATSTACK=(hatstack)
 else
-  HATSTACK=(node "${CLAUDE_PLUGIN_ROOT}/../../bin/hatstack.mjs")
+  HATSTACK=(node "${CLAUDE_PLUGIN_ROOT}/bin/hatstack.mjs")
 fi
 
 "${HATSTACK[@]}" hook claude-pre-write

@@ -1,0 +1,15 @@
+{
+  "name": "hatstack",
+  "owner": { "name": "Algorabia" },
+  "metadata": {
+    "description": "Plan with three approaches, gate on a human, build test-first, review adversarially with a different agent. One plugin, hats enabled per project in .hatstack/config.json.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "hatstack",
+      "source": ".",
+      "description": "The loop, the three gates, the reviewer dispatch, and every hat. Requires Node >= 20. No jq."
+    }
+  ]
+}
